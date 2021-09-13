@@ -1,0 +1,2 @@
+INSERT INTO DEPARTMENT (dept_id, name, description) VALUES ('4711', 'SW-Engineering', 'Software Engineering');
+INSERT INTO DEPARTMENT (dept_id, name, description) VALUES ('4712', 'Administration', 'General Administration');

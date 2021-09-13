@@ -1,0 +1,35 @@
+spring:
+  application:
+    name: tester
+    
+  cloud:
+    consul:
+      port: ${CONSUL_PORT}
+      host: ${CONSUL_SERVER}
+      scheme: ${CONSUL_SCHEME}
+
+      config:
+        enabled: true
+        format: YAML
+        # getting consul ACL token from OS environment
+        acl-token: ${CONSUL_DEPARTMENT_ACL_TOKEN}
+
+    vault:
+      host: ${VAULT_SERVER}
+      port: ${VAULT_PORT}
+      scheme: ${VAULT_SCHEME}
+      # Vault AppRole authentication scheme
+      authentication: approle
+      app-role:
+        role-id: 36faa4bb-3d81-95e4-b191-27fff3ae844e
+        # getting secret ID from OS environment
+        secret-id: ${VAULT_APPROLE_SECRET_ID}
+ 
+      # Vault key-value store
+      generic:
+        enabled: true
+        backend: secret
+        profile-separator: '/'
+        default-context: application
+        application-name: DepartmentServiceOAuth2
+        

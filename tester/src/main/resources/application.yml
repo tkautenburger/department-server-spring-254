@@ -1,0 +1,195 @@
+#--------------------------------------
+# Server Configuration
+#--------------------------------------
+
+server:
+  port: 8090
+  ssl:
+    enabled: true
+  # this is the unsecured http port on a second tomcat connector
+  http:
+    port: 8082
+    
+spring:
+
+#--------------------------------------
+# Persistence Configuration
+#--------------------------------------
+
+  datasource:
+    # url: jdbc:h2:mem:demo
+    url: jdbc:postgresql://demodb:5432/demo?ssl=true&sslfactory=org.postgresql.ssl.NonValidatingFactory
+    # this configuration comes from Vault
+    # username: <this is stored in vault>
+    # password: <this is stored in vault>
+  jpa:
+    properties:
+      hibernate: 
+        jdbc:
+          lob:
+            non_contextual_creation: true
+            
+
+#--------------------------------------
+# Cloud Streams Kafka Configuration
+#--------------------------------------
+ 
+  cloud:
+    stream:
+      bindings:
+        output:
+          destination: auditing
+          binder: kafka-out
+          content-type: application/json
+          group: auditGroup
+      binders:   
+        kafka-out:
+          type: kafka
+          environment:
+            spring:
+              cloud:
+                stream:
+                  kafka:
+                    binder:
+                      zkNodes: kafka-zookeeper-0.kafka-zookeeper-headless.messaging.svc.cluster.local:2182
+                      brokers: kafka-0.kafka-headless.messaging.svc.cluster.local:9093
+                      configuration:
+                        security.protocol: SSL
+                        ssl.truststore.location: ${TRUST_STORE_PATH}
+                        ssl.truststore.password: ${TRUST_STORE_PASSWORD}
+                        ssl.keystore.location: ${KEY_STORE_PATH}
+                        ssl.keystore.password: ${KEY_STORE_PASSWORD}
+                        ssl.key.password: ${KEY_STORE_PASSWORD}
+
+                      # SSL configuration requires to have truststore and keystore in file system thus Kafka in the current 
+                      # version does not provide a custom SSL context loader
+
+#--------------------------------------
+# Vault CA Configuration
+#--------------------------------------
+
+# This is for the automated certificate request and rotation with Vault
+pki:
+  role: server
+  common-name: department-service
+  alt-names: 
+  - department-service.default.svc.cluster.local
+  - department-service-oauth2
+  - department-service-oauth2.default.svc.cluster.local
+  # Redis URL to provide distributed lock
+  redis-url: redis://redis:6379
+
+
+#**************************************
+# Custom Configurations
+#**************************************
+
+legendlime:
+
+  #--------------------------------------
+  # Rate Limiting Configuration
+  #--------------------------------------
+  ratelimit:
+    # maximum average request rate per second
+    average: 10d
+
+  #--------------------------------------
+  # OPA Policy Based Authorization 
+  #--------------------------------------
+  opa:
+    enabled: true
+    opa-url: https://opa:8181/v1/data/http/authz/allow
+
+
+#--------------------------------------
+# Tracing Configuration
+#--------------------------------------
+
+opentracing:
+  jaeger:
+    log-spans: true
+    udp-sender:
+      host: jaeger-agent
+      port: 6831
+
+#--------------------------------------
+# Generic Security Configuration
+#--------------------------------------
+
+# Can be set to false to disable security during local development
+rest:
+  security:
+    enabled: true
+    api-matcher: /v1/**
+    cors:
+      allowed-origins: "*"
+      allowed-headers: "*"
+      allowed-methods: GET,POST,PUT,PATCH,DELETE,OPTIONS
+      max-age: 3600
+
+    issuer-uri: https://keycloak:8443/auth/realms/Demo
+
+#--------------------------------------
+# OAuth2 Configuration
+#--------------------------------------
+
+security:
+  oauth2:
+    resource:
+      id: department-service
+      prefer-token-info: true
+      token-info-uri: ${rest.security.issuer-uri}/protocol/openid-connect/token/introspect
+      user-info-uri: ${rest.security.issuer-uri}/protocol/openid-connect/userinfo
+      # Get the key from the JWKS endpoint instead of having it in the static configuration
+      # jwk:
+      #   key-set-uri: ${rest.security.issuer-uri}/protocol/openid-connect/certs
+      # Your public Key may be different, remember to replace this one 
+      jwt:
+        key-value: -----BEGIN PUBLIC KEY-----MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAq0glnf0bnjjZ8izkCa93VLUIh4XKPrKmPFxqEuSbkHbHwCcSoqQGN52QHg1SSuRu6k37Eetsucw14MF+s1W0cJB8RZmgoS26OZ9IyX4LI6xbksv0/RCwWgRHfsWV7DFWnCOx9xAt6U2I+6i2P7wb9saPZdAu3xj/o41jv6uz+1clhfgLYevsWjLH7wfLG94mPtquUrKyLYRcHc5zORetYGgD6KJb+yIhOVr6KefrqwkSfXRQcwnGBbPqKOFthQfAKnN8Ta7FtMcb6/AEjx5//kA6xPmBkHP9akCPVg9DNkST0QMqY21pNFmMFx5/wC2yf9AolwLFnQDOHz73MNwp2wIDAQAB-----END PUBLIC KEY-----
+
+# Required for micro services that needs to call another secured micro service call
+# These parameters are not needed if this service acts only as a resource server
+    client:
+      client-id: department-service
+      # client-secret: <this is stored in vault>
+      user-authorization-uri: ${rest.security.issuer-uri}/protocol/openid-connect/auth
+      access-token-uri: ${rest.security.issuer-uri}/protocol/openid-connect/token
+      scope: openid
+      grant-type: client_credentials
+
+#--------------------------------------
+# Logging Configuration
+#--------------------------------------
+
+logging:
+  level:
+    '[de.legendlime.departmentService]': INFO
+    '[io.opentracing]': ERROR
+    '[io.jaegertracing]': ERROR
+    org:
+      springframework:
+        boot:
+          autoconfigure:
+            logging: INFO
+        security: INFO
+      root: INFO 
+
+#--------------------------------------
+# Actuator Configuration
+#--------------------------------------
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics
+  metrics:
+    export:
+      elastic: 
+        enabled: true
+        auto-create-index: false  # auto-create set _source mapping to disabled thus no values show up in elasticsearch
+        step: 1m
+        index: metrics
+        user-name: elastic
+        password: changeme
+        host: https://elasticsearch.monitoring.svc.cluster.local:9200
