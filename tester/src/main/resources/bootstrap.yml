@@ -3,6 +3,7 @@ spring:
     name: tester
     
   cloud:
+  
     consul:
       port: ${CONSUL_PORT}
       host: ${CONSUL_SERVER}

@@ -11,6 +11,10 @@ server:
     port: 8082
     
 spring:
+  # must be set to include consul in the configuration bootstrapping process
+  config:
+    import:
+    - "optional:consul:"
 
 #--------------------------------------
 # Persistence Configuration
